@@ -2,11 +2,10 @@ import time
 import itertools
 import random
 import sys
-
 import numpy as np
 from PIL import Image
 from skimage import img_as_float
-from skimage.measure import compare_mse
+from skimage.metrics import mean_squared_error as compare_mse
 from tqdm import tqdm
 
 def shuffle_first_items(lst, i):
@@ -131,8 +130,11 @@ class TileBox:
 
     def best_tile_block_match(self, tile_block_original):
         a = np.array(tile_block_original).astype("float32")
-        match_results = ((self.tile_array - a.reshape((1,) + a.shape) )**2).mean((1,2,3)) #[img_mse(t, tile_block_original) for t in self.tiles] 
-        #best_fit_tile_index = np.argmin(match_results)
+        if self.config.color_mode == 'RGB':
+            match_results = ((self.tile_array - a.reshape((1,) + a.shape) )**2).mean((1,2,3)) #[img_mse(t, tile_block_original) for t in self.tiles]
+        elif self.config.color_mode == 'L':
+            match_results = ((self.tile_array - a.reshape((1,) + a.shape) )**2).mean((1,2))
+        #best_fit_tile_index = np.argmin(match_results) # TODO: This only works for color images.
         return match_results.argsort() #best_fit_tile_index
 
     def best_tile_from_block(self, tile_block_original, reuse=False):
@@ -244,6 +246,8 @@ def create_mosaic(source_path, target, tile_ratio=1920/800, tile_width=75, match
     shuffle_first -- Mosiac will be filled out starting in the center for best effect. Also, 
         we will shuffle the order of assessment so that all of our best images aren't 
         necessarily in one spot.
+    rotate -- Rotate images to check for better matches in rotated version
+    match_width -- Resolution at which the tiles are compared to the source image.
     """
     config = Config(
         tile_ratio = tile_ratio,		# height/width of mosaic tiles in pixels
